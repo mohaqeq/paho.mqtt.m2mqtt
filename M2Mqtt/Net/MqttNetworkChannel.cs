@@ -31,6 +31,7 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace uPLibrary.Networking.M2Mqtt
 {
@@ -83,6 +84,11 @@ namespace uPLibrary.Networking.M2Mqtt
         private SslStream sslStream;
 #if (!MF_FRAMEWORK_VERSION_V4_2 && !MF_FRAMEWORK_VERSION_V4_3)
         private NetworkStream netStream;
+
+        /// <summary>
+        /// List of Protocol for ALPN
+        /// </summary>
+        private List<string> alpnProtocols;
 #endif
 #endif
 
@@ -230,6 +236,17 @@ namespace uPLibrary.Networking.M2Mqtt
 #endif
         }
 
+#if !(MF_FRAMEWORK_VERSION_V4_2 || MF_FRAMEWORK_VERSION_V4_3 || COMPACT_FRAMEWORK)
+        /// <param name="userCertificateSelectionCallback">A RemoteCertificateValidationCallback delegate responsible for validating the certificate supplied by the remote party</param>
+        /// <param name="userCertificateValidationCallback">A LocalCertificateSelectionCallback delegate responsible for selecting the certificate used for authentication</param>
+        public MqttNetworkChannel(string remoteHostName, int remotePort, bool secure, X509Certificate caCert, X509Certificate clientCert, MqttSslProtocols sslProtocol,
+            RemoteCertificateValidationCallback userCertificateValidationCallback,
+            LocalCertificateSelectionCallback userCertificateSelectionCallback, List<string> alpnProtocols)
+            : this(remoteHostName, remotePort, secure, caCert, clientCert, sslProtocol, userCertificateValidationCallback, userCertificateSelectionCallback)
+        {
+            this.alpnProtocols = alpnProtocols;
+        }
+#endif
         /// <summary>
         /// Connect to remote server
         /// </summary>
@@ -264,10 +281,38 @@ namespace uPLibrary.Networking.M2Mqtt
                 if (this.clientCert != null)
                     clientCertificates = new X509CertificateCollection(new X509Certificate[] { this.clientCert });
 #if (NETSTANDARD1_6 || NETSTANDARD2_0 || NETCOREAPP3_1)
-                this.sslStream.AuthenticateAsClientAsync(this.remoteHostName,
-                    clientCertificates,
-                    MqttSslUtility.ToSslPlatformEnum(this.sslProtocol),
-                    false).Wait();
+
+                if ((this.alpnProtocols != null) && (0 < this.alpnProtocols.Count))
+                {
+                    this.sslStream = new SslStream(this.netStream, false);
+                    SslClientAuthenticationOptions authOptions = new SslClientAuthenticationOptions();
+                    List<SslApplicationProtocol> sslProtocolList = new List<SslApplicationProtocol>();
+                    foreach (string alpnProtocol in this.alpnProtocols)
+                    {
+                        sslProtocolList.Add(new SslApplicationProtocol(alpnProtocol));
+                    }
+                    authOptions.ApplicationProtocols = sslProtocolList;
+                    authOptions.EnabledSslProtocols = MqttSslUtility.ToSslPlatformEnum(this.sslProtocol);
+                    authOptions.TargetHost = remoteHostName;
+                    authOptions.AllowRenegotiation = false;
+                    authOptions.ClientCertificates = clientCertificates;
+                    authOptions.EncryptionPolicy = EncryptionPolicy.RequireEncryption;
+                    try
+                    {
+                        this.sslStream.AuthenticateAsClientAsync(authOptions).Wait();
+                    }
+                    catch(Exception ex)
+                    {
+                        throw ex;
+                    }
+                }
+                else
+                {
+                    this.sslStream.AuthenticateAsClientAsync(this.remoteHostName,
+                        clientCertificates,
+                        MqttSslUtility.ToSslPlatformEnum(this.sslProtocol),
+                        false).Wait();
+                }
 #else
                 this.sslStream.AuthenticateAsClient(this.remoteHostName,
                     clientCertificates,
