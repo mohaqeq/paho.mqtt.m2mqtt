@@ -297,14 +297,8 @@ namespace uPLibrary.Networking.M2Mqtt
                     authOptions.AllowRenegotiation = false;
                     authOptions.ClientCertificates = clientCertificates;
                     authOptions.EncryptionPolicy = EncryptionPolicy.RequireEncryption;
-                    try
-                    {
-                        this.sslStream.AuthenticateAsClientAsync(authOptions).Wait();
-                    }
-                    catch(Exception ex)
-                    {
-                        throw ex;
-                    }
+
+                    this.sslStream.AuthenticateAsClientAsync(authOptions).Wait();
                 }
                 else
                 {
