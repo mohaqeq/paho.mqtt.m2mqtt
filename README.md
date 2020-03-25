@@ -59,7 +59,9 @@ ATTENTION : .Net Micro Framework supports up to TLSV1
 *ALPN support*
 
 This library supports ALPN. You can connect to broker that provide ALPN connection like AWS IoT Core.
-If you connect to broker with ALPN, specify a protocol name. For example, you need to specify "x-amzn-mqtt-ca" as aprotocol name when you connect to AWS IoT Core with ALPN.
+If you connect to broker with ALPN, set a protocol name to "ALPNProtocols" paramerter. For example, you need to set "x-amzn-mqtt-ca" as a protocol name when you connect to AWS IoT Core with ALPN.
+
+note: ALPNProtocols parameter is list of string for protocol names.
 
 About ALPN: https://tools.ietf.org/html/rfc7301
 
